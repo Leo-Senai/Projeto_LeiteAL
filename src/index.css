@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme inline {
+  --color-background: #f5f0e8;
+  --color-foreground: #1a1a14;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1a14;
+  --color-primary: #1b4d2e;
+  --color-primary-foreground: #f5f0e8;
+  --color-secondary: #e8f0e4;
+  --color-secondary-foreground: #1b4d2e;
+  --color-muted: #ede8de;
+  --color-muted-foreground: #6b6455;
+  --color-accent: #c8882a;
+  --color-accent-foreground: #ffffff;
+  --color-border: #ddd6c8;
+  --color-ring: #1b4d2e;
+  --radius: 6px;
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body: 'Outfit', system-ui, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f5f0e8;
+  color: #1a1a14;
+  font-family: 'Outfit', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 0; background: transparent; }

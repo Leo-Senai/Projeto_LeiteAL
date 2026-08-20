@@ -1,0 +1,10 @@
+{
+  "description": "This online course platform features a user-friendly homepage showcasing course summaries and an easy registration button, enhancing user engagement and accessibility.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
