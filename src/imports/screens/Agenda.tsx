@@ -8,7 +8,10 @@ function daysInMonth(year: number, month: number) {
 }
 
 export default function Agenda() {
-  const [items, setItems] = useState<EventItem[]>([])
+  const [items, setItems] = useState<EventItem[]>([
+    { id: 1, title: 'Ordenha programada', date: '2026-08-27' },
+    { id: 2, title: 'Vacina de rotina', date: '2026-08-28' },
+  ])
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
   const [today] = useState(new Date())
@@ -28,7 +31,7 @@ export default function Agenda() {
   }
 
   const monthCalendar = useMemo(() => {
-    const firstDay = new Date(viewYear, viewMonth, 1).getDay() // 0..6 (Sun..Sat)
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay()
     const total = daysInMonth(viewYear, viewMonth)
     const weeks: Array<Array<number | null>> = []
     let day = 1
@@ -67,18 +70,26 @@ export default function Agenda() {
 
   return (
     <Card>
-      <h2>Agenda</h2>
+      <div className="section-header">
+        <div>
+          <div className="eyebrow">Agenda</div>
+          <h2>Calendário da fazenda</h2>
+        </div>
+        <span className="status-pill info">{items.length} eventos</span>
+      </div>
       <p className="muted">Calendário de eventos e tarefas da fazenda.</p>
 
-      <div className="controls">
-        <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
-        <input className="input" value={date} onChange={e => setDate(e.target.value)} type="date" />
-        <button className="btn btn-primary" onClick={addEvent}>Adicionar</button>
+      <div className="sub-panel">
+        <div className="controls">
+          <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
+          <input className="input" value={date} onChange={e => setDate(e.target.value)} type="date" />
+          <button className="btn btn-primary" onClick={addEvent}>Adicionar</button>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-        <div style={{ width: 520 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+      <div className="panel-grid" style={{ marginTop: 18 }}>
+        <div className="sub-panel">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-ghost" onClick={prevMonth}>←</button>
               <button className="btn btn-ghost" onClick={nextMonth}>→</button>
@@ -87,57 +98,49 @@ export default function Agenda() {
             <div />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, textAlign: 'center', color: '#6b7280', fontSize: 12 }}>
+          <div className="calendar-grid" style={{ fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
             {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => <div key={d}>{d}</div>)}
           </div>
 
-          <div style={{ marginTop: 8 }}>
-            {monthCalendar.map((week, wi) => (
-              <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 6 }}>
-                {week.map((d, di) => {
-                  const iso = d ? new Date(viewYear, viewMonth, d).toISOString().slice(0,10) : ''
-                  const has = d ? Boolean(eventsByDate[iso] && eventsByDate[iso].length) : false
-                  const isToday = d && iso === today.toISOString().slice(0,10)
-                  return (
-                    <div key={di} onClick={() => d && setSelectedDate(iso)} style={{ padding: 10, borderRadius: 8, background: isToday ? '#e6f0ea' : '#fff', border: `1px solid ${has ? '#1b5e35' : '#e6e1db'}`, cursor: d ? 'pointer' : 'default', minHeight: 68 }}>
-                      <div style={{ textAlign: 'left', fontWeight: 700 }}>{d || ''}</div>
-                      <div style={{ marginTop: 6 }}>
-                        {has && <div style={{ width: 10, height: 10, borderRadius: 6, background: '#1b5e35', marginTop: 6 }} />}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
+          <div className="calendar-grid" style={{ marginTop: 8 }}>
+            {monthCalendar.flat().map((d, di) => {
+              if (!d) return <div key={`empty-${di}`} style={{ minHeight: 78, borderRadius: 14 }} />
+              const iso = new Date(viewYear, viewMonth, d).toISOString().slice(0,10)
+              const has = Boolean(eventsByDate[iso] && eventsByDate[iso].length)
+              const isToday = iso === today.toISOString().slice(0,10)
+              return (
+                <div key={d} className={`calendar-day ${has ? 'is-event' : ''} ${isToday ? 'is-today' : ''}`} onClick={() => setSelectedDate(iso)}>
+                  <em>{d}</em>
+                  {has && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1b5e35', marginTop: 8, marginLeft: 'auto', marginRight: 'auto' }} />}
+                </div>
+              )
+            })}
           </div>
         </div>
 
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Eventos</div>
+        <div className="sub-panel">
+          <h3>{selectedDate ? `Evento em ${selectedDate}` : 'Próximos eventos'}</h3>
           {selectedDate ? (
-            <div>
-              <div style={{ marginBottom: 8, color: '#6b7280' }}>Dia selecionado: {selectedDate}</div>
-              <ul className="list">
-                {(eventsByDate[selectedDate] || []).map(ev => (
-                  <li key={ev.id}>
-                    <strong>{ev.title}</strong> — {ev.date}
-                    <button className="btn btn-ghost" onClick={() => removeEvent(ev.id)} style={{ marginLeft: 8 }}>Remover</button>
-                  </li>
-                ))}
-                {(!eventsByDate[selectedDate] || eventsByDate[selectedDate].length === 0) && <div>Nenhum evento neste dia.</div>}
-              </ul>
+            <div className="data-list">
+              {(eventsByDate[selectedDate] || []).map(ev => (
+                <div key={ev.id} className="data-row">
+                  <strong>{ev.title}</strong>
+                  <button className="btn btn-ghost" onClick={() => removeEvent(ev.id)}>Remover</button>
+                </div>
+              ))}
+              {(!eventsByDate[selectedDate] || eventsByDate[selectedDate].length === 0) && <div className="empty-state">Nenhum evento neste dia.</div>}
             </div>
           ) : (
-            <div>
-              <div style={{ marginBottom: 8, color: '#6b7280' }}>Selecione um dia no calendário para ver os eventos.</div>
-              <ul className="list">
-                {items.map(it => (
-                  <li key={it.id}>
-                    <strong>{it.title}</strong> — {it.date}{' '}
-                    <button className="btn btn-ghost" onClick={() => removeEvent(it.id)} style={{ marginLeft: 8 }}>Remover</button>
-                  </li>
-                ))}
-              </ul>
+            <div className="data-list">
+              {items.map(it => (
+                <div key={it.id} className="data-row">
+                  <div>
+                    <strong>{it.title}</strong>
+                    <div style={{ color: '#726c62', fontSize: 12 }}>{it.date}</div>
+                  </div>
+                  <button className="btn btn-ghost" onClick={() => removeEvent(it.id)}>Remover</button>
+                </div>
+              ))}
             </div>
           )}
         </div>

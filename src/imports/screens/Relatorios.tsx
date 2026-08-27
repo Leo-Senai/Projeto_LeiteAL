@@ -33,20 +33,47 @@ export default function Relatorios() {
 
   return (
     <Card>
-      <h2>Relatórios</h2>
+      <div className="section-header">
+        <div>
+          <div className="eyebrow">Relatórios</div>
+          <h2>Indicadores e exportação</h2>
+        </div>
+        <span className="status-pill success">Atualizado</span>
+      </div>
       <p className="muted">Geração e exportação de relatórios.</p>
 
-      <div className="controls">
+      <div className="metric-grid">
+        <div className="metric-card">
+          <span className="label">Produção</span>
+          <strong>1.200 L</strong>
+          <small>últimos 7 dias</small>
+        </div>
+        <div className="metric-card">
+          <span className="label">Vacas</span>
+          <strong>45</strong>
+          <small>em acompanhamento</small>
+        </div>
+        <div className="metric-card">
+          <span className="label">Despesas</span>
+          <strong>R$ 3.200</strong>
+          <small>mês atual</small>
+        </div>
+      </div>
+
+      <div className="controls" style={{ marginTop: 18 }}>
         <button className="btn btn-primary" onClick={gerarResumo}>Gerar resumo</button>
         <button className="btn btn-ghost" onClick={downloadCSV}>Exportar CSV</button>
       </div>
 
       {summary && (
-        <div style={{ marginTop: 12 }}>
-          <h4>Resumo</h4>
+        <div className="sub-panel" style={{ marginTop: 18 }}>
+          <h3>Resumo</h3>
           <ul className="list">
             {Object.entries(summary).map(([k, v]) => (
-              <li key={k}>{k}: {v}</li>
+              <li key={k}>
+                <span>{k}</span>
+                <strong>{v}</strong>
+              </li>
             ))}
           </ul>
         </div>

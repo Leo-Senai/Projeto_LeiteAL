@@ -287,7 +287,6 @@ export default function App() {
       case 'sanidade': return <Sanidade />
       case 'alimentacao': return <Alimentacao />
       case 'financeiro': return <Financeiro transactions={transactions} onAddTransaction={addTransaction} />
-      case 'reproducao': return <Reproducao cows={rankingVacas} />
       case 'agenda': return <Agenda />
       case 'relatorios': return <Relatorios />
       default: return null
