@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import Login from './components/Login'
+import { useAuth } from './contexts/AuthContext'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell,
@@ -46,7 +48,7 @@ const rebanhoData = [
   { name: 'Bezerras', value: 7, color: GL },
 ]
 
-const rankingVacas = [
+const initialVacas = [
   { id: '124', nome: 'Estrela', litros: 42, raca: 'Holandesa', lactacao: 3, tendencia: 'up' },
   { id: '078', nome: 'Mimosa', litros: 39, raca: 'Girolando', lactacao: 5, tendencia: 'up' },
   { id: '312', nome: 'Bonita', litros: 38, raca: 'Holandesa', lactacao: 2, tendencia: 'up' },
@@ -216,8 +218,10 @@ function IAModal({ onClose }: { onClose: () => void }) {
 
 // ─── Main app ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const { user, logout } = useAuth()
   const [activeNav, setActiveNav] = useState('dashboard')
   const [pricePerLiter, setPricePerLiter] = useState(2.84)
+  const [cows, setCows] = useState(() => initialVacas)
   const [productionRecords, setProductionRecords] = useState<{ id: number; date: string; liters: number; animal?: string }[]>([])
   const [transactions, setTransactions] = useState<{ id: number; desc: string; amount: number; type: 'receita' | 'despesa' }[]>([])
   const [showIA, setShowIA] = useState(false)
@@ -228,16 +232,47 @@ export default function App() {
   const [ordenhaRegistrada, setOrdenhaRegistrada] = useState(false)
 
   const registrarOrdenha = () => {
-    if (ordenhaLitros && ordenhaVaca) setOrdenhaRegistrada(true)
+    const litros = Number(ordenhaLitros)
+    if (!ordenhaLitros || Number.isNaN(litros) || litros <= 0) return
+    const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    addProductionRecord({ date: today, liters: litros, animal: ordenhaVaca || undefined })
+    setOrdenhaRegistrada(true)
+    setOrdenhaLitros('')
+    setOrdenhaVaca('')
   }
 
   function addProductionRecord(r: { date: string; liters: number; animal?: string }) {
     const rec = { ...r, id: Date.now() }
     setProductionRecords(prev => [...prev, rec])
+    // se vier com animal (id ou nome), atualizar litros da vaca
+    if (r.animal) {
+      setCows(prev => prev.map(c => {
+        if (c.id === r.animal || c.nome === r.animal) {
+          return { ...c, litros: Number((c.litros + r.liters).toFixed(2)) }
+        }
+        return c
+      }))
+    }
     // criar transação de receita automática
     const revenue = Number((r.liters * pricePerLiter).toFixed(2))
-    const tx = { id: Date.now() + 1, desc: `Venda leite${r.animal ? ' · ' + r.animal : ''} ${r.date}`, amount: revenue, type: 'receita' as const }
+    const animalLabel = r.animal ? (cows.find(c => c.id === r.animal)?.nome || r.animal) : ''
+    const tx = { id: Date.now() + 1, desc: `Venda leite${animalLabel ? ' · ' + animalLabel : ''} ${r.date}`, amount: revenue, type: 'receita' as const }
     setTransactions(prev => [...prev, tx])
+  }
+
+  function addCow(c: { id?: string; nome: string; litros?: number; raca?: string; lactacao?: number; tendencia?: string }) {
+    const id = c.id || String(Date.now()).slice(-4)
+    setCows(prev => [...prev, { id, nome: c.nome, litros: c.litros ?? 0, raca: c.raca, lactacao: c.lactacao, tendencia: c.tendencia }])
+    return id
+  }
+
+  function removeProductionRecord(id: number) {
+    const rec = productionRecords.find(r => r.id === id)
+    setProductionRecords(prev => prev.filter(r => r.id !== id))
+    if (rec) {
+      // remover transação relacionada pela data (simples heurística)
+      setTransactions(prev => prev.filter(tx => !tx.desc.includes(rec.date)))
+    }
   }
 
   function addTransaction(tx: { desc: string; amount: number; type: 'receita' | 'despesa' }) {
@@ -246,9 +281,9 @@ export default function App() {
 
   const sectionComponent = (() => {
     switch (activeNav) {
-      case 'rebanho': return <Rebanho data={rebanhoData} cows={rankingVacas} />
-      case 'producao': return <Producao records={productionRecords} onAddRecord={addProductionRecord} pricePerLiter={pricePerLiter} setPricePerLiter={setPricePerLiter} rebanho={rebanhoData} cows={rankingVacas} />
-      case 'reproducao': return <Reproducao />
+      case 'rebanho': return <Rebanho data={rebanhoData} cows={cows} />
+      case 'producao': return <Producao records={productionRecords} onAddRecord={addProductionRecord} onRemoveRecord={removeProductionRecord} onAddCow={addCow} pricePerLiter={pricePerLiter} setPricePerLiter={setPricePerLiter} rebanho={rebanhoData} cows={cows} />
+      case 'reproducao': return <Reproducao cows={cows} />
       case 'sanidade': return <Sanidade />
       case 'alimentacao': return <Alimentacao />
       case 'financeiro': return <Financeiro transactions={transactions} onAddTransaction={addTransaction} />
@@ -258,6 +293,8 @@ export default function App() {
       default: return null
     }
   })()
+
+  if (!user) return <Login onSuccess={() => { /* re-render via context */ }} />
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#f0ede6', fontFamily: "'Outfit', sans-serif" }}>
@@ -290,11 +327,14 @@ export default function App() {
 
         {/* User */}
         <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: AM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: WHITE, fontWeight: 700, flexShrink: 0 }}>JB</div>
-          <div>
-            <div className="text-xs font-semibold" style={{ color: CR }}>Leonardo Batista</div>
-            <div className="text-xs" style={{ color: 'rgba(245,240,232,0.45)' }}>Fazenda São Roque</div>
+          <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: AM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: WHITE, fontWeight: 700, flexShrink: 0 }}>
+            {String((user?.name || 'U').split(' ').map(p => p[0]).join('')).slice(0,2).toUpperCase()}
           </div>
+          <div className="flex-1">
+            <div className="text-xs font-semibold" style={{ color: CR }}>{user?.name}</div>
+            <div className="text-xs" style={{ color: 'rgba(245,240,232,0.45)' }}>Produtor</div>
+          </div>
+          <button onClick={logout} className="text-xs" style={{ color: 'rgba(245,240,232,0.85)' }}>Sair</button>
         </div>
 
         {/* Nav */}
@@ -379,10 +419,22 @@ export default function App() {
             <>
               {/* ── Stat cards ─────────────────────────────────────────────── */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatCard icon="🥛" label="Produção Hoje" value="1.284 L" sub="+2,1% vs. ontem" color={G} />
-                <StatCard icon="💵" label="Receita Hoje" value="R$ 3.640" sub="R$ 2,84/L médio" color={G} />
-                <StatCard icon="💰" label="Lucro Hoje" value="R$ 1.220" sub="Margem 33,5%" color={AM} />
-                <StatCard icon="🐄" label="Vacas em Lactação" value="63" sub="18 secas · 12 novilhas" color={TEXT} />
+                {
+                  (() => {
+                    const today = new Date().toISOString().slice(0,10)
+                    const productionToday = productionRecords.filter(r => r.date === today).reduce((s, r) => s + r.liters, 0)
+                    const revenueToday = productionToday * pricePerLiter
+                    const lactacaoCount = cows.length
+                    return (
+                      <>
+                        <StatCard icon="🥛" label="Produção Hoje" value={`${productionToday.toFixed(2)} L`} sub={productionToday ? `+ vs. ontem` : '—'} color={G} />
+                        <StatCard icon="💵" label="Receita Hoje" value={`R$ ${revenueToday.toFixed(2)}`} sub={`R$ ${pricePerLiter.toFixed(2)}/L`} color={G} />
+                        <StatCard icon="💰" label="Lucro Hoje" value="R$ 1.220" sub="Margem 33,5%" color={AM} />
+                        <StatCard icon="🐄" label="Vacas em Lactação" value={`${lactacaoCount}`} sub="em rebanho" color={TEXT} />
+                      </>
+                    )
+                  })()
+                }
               </div>
 
               {/* ── Charts row ─────────────────────────────────────────────── */}
@@ -456,13 +508,13 @@ export default function App() {
                     <span className="text-sm font-semibold" style={{ color: TEXT }}>Ranking do rebanho</span>
                     <button className="text-xs" style={{ color: G }}>Ver todas →</button>
                   </div>
-                  {rankingVacas.map((v, i) => (
+                  {cows.map((v, i) => (
                     <div
                       key={i}
                       className="flex items-center gap-3 transition-colors duration-100"
                       style={{
                         padding: '10px 20px',
-                        borderBottom: i < rankingVacas.length - 1 ? `1px solid ${BORDER}` : 'none',
+                        borderBottom: i < cows.length - 1 ? `1px solid ${BORDER}` : 'none',
                       }}
                     >
                       <span style={{ fontSize: '0.9rem', width: '20px', textAlign: 'center' }}>
