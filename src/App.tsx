@@ -217,6 +217,9 @@ function IAModal({ onClose }: { onClose: () => void }) {
 // ─── Main app ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [activeNav, setActiveNav] = useState('dashboard')
+  const [pricePerLiter, setPricePerLiter] = useState(2.84)
+  const [productionRecords, setProductionRecords] = useState<{ id: number; date: string; liters: number; animal?: string }[]>([])
+  const [transactions, setTransactions] = useState<{ id: number; desc: string; amount: number; type: 'receita' | 'despesa' }[]>([])
   const [showIA, setShowIA] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showOrdenha, setShowOrdenha] = useState(false)
@@ -228,14 +231,28 @@ export default function App() {
     if (ordenhaLitros && ordenhaVaca) setOrdenhaRegistrada(true)
   }
 
+  function addProductionRecord(r: { date: string; liters: number; animal?: string }) {
+    const rec = { ...r, id: Date.now() }
+    setProductionRecords(prev => [...prev, rec])
+    // criar transação de receita automática
+    const revenue = Number((r.liters * pricePerLiter).toFixed(2))
+    const tx = { id: Date.now() + 1, desc: `Venda leite${r.animal ? ' · ' + r.animal : ''} ${r.date}`, amount: revenue, type: 'receita' as const }
+    setTransactions(prev => [...prev, tx])
+  }
+
+  function addTransaction(tx: { desc: string; amount: number; type: 'receita' | 'despesa' }) {
+    setTransactions(prev => [...prev, { ...tx, id: Date.now() }])
+  }
+
   const sectionComponent = (() => {
     switch (activeNav) {
-      case 'rebanho': return <Rebanho />
-      case 'producao': return <Producao />
+      case 'rebanho': return <Rebanho data={rebanhoData} cows={rankingVacas} />
+      case 'producao': return <Producao records={productionRecords} onAddRecord={addProductionRecord} pricePerLiter={pricePerLiter} setPricePerLiter={setPricePerLiter} rebanho={rebanhoData} cows={rankingVacas} />
       case 'reproducao': return <Reproducao />
       case 'sanidade': return <Sanidade />
       case 'alimentacao': return <Alimentacao />
-      case 'financeiro': return <Financeiro />
+      case 'financeiro': return <Financeiro transactions={transactions} onAddTransaction={addTransaction} />
+      case 'reproducao': return <Reproducao cows={rankingVacas} />
       case 'agenda': return <Agenda />
       case 'relatorios': return <Relatorios />
       default: return null
