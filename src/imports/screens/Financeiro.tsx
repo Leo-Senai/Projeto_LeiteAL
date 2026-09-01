@@ -8,6 +8,10 @@ export default function Financeiro({ transactions, onAddTransaction }: { transac
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
   const [type, setType] = useState<'receita' | 'despesa'>('receita')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editDesc, setEditDesc] = useState('')
+  const [editAmount, setEditAmount] = useState('')
+  const [editType, setEditType] = useState<'receita' | 'despesa'>('receita')
 
   const txs = transactions ?? localTxs
 
@@ -26,6 +30,26 @@ export default function Financeiro({ transactions, onAddTransaction }: { transac
   function removeTx(id: number) {
     if (transactions) return
     setLocalTxs(prev => prev.filter(t => t.id !== id))
+  }
+
+  function startEdit(t: Transaction) {
+    setEditingId(t.id)
+    setEditDesc(t.desc)
+    setEditAmount(t.amount.toString())
+    setEditType(t.type)
+  }
+
+  function saveEdit(id: number) {
+    const val = parseFloat(editAmount)
+    if (!editDesc || Number.isNaN(val)) return
+    setLocalTxs(prev => prev.map(t => 
+      t.id === id ? { ...t, desc: editDesc, amount: val, type: editType } : t
+    ))
+    setEditingId(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
   }
 
   const receitas = txs.filter(t => t.type === 'receita').reduce((s, t) => s + t.amount, 0)
@@ -79,17 +103,67 @@ export default function Financeiro({ transactions, onAddTransaction }: { transac
         <ul className="list">
           {txs.length === 0 && <div className="empty-state">Nenhuma movimentação registrada.</div>}
           {txs.map(t => (
-            <li key={t.id}>
-              <div>
-                <strong>{t.desc}</strong>
-                <div style={{ color: '#726c62', fontSize: 12 }}>{t.type === 'receita' ? 'Receita' : 'Despesa'}</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className={`status-pill ${t.type === 'receita' ? 'success' : 'danger'}`}>
-                  {t.type === 'receita' ? 'R$ +' : 'R$ -'}{t.amount.toFixed(2)}
-                </span>
-                {!transactions && <button className="btn btn-ghost" onClick={() => removeTx(t.id)}>Remover</button>}
-              </div>
+            <li key={t.id} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
+              {editingId === t.id ? (
+                <>
+                  <div className="controls" style={{ width: '100%', gap: 8 }}>
+                    <input 
+                      className="input" 
+                      value={editDesc} 
+                      onChange={e => setEditDesc(e.target.value)} 
+                      placeholder="Descrição" 
+                    />
+                    <input 
+                      className="input" 
+                      value={editAmount} 
+                      onChange={e => setEditAmount(e.target.value)} 
+                      placeholder="Valor" 
+                      style={{ width: 120 }} 
+                    />
+                    <select 
+                      className="select" 
+                      value={editType} 
+                      onChange={e => setEditType(e.target.value as any)} 
+                      style={{ width: 140 }}
+                    >
+                      <option value="receita">Receita</option>
+                      <option value="despesa">Despesa</option>
+                    </select>
+                    <button className="btn btn-primary" onClick={() => saveEdit(t.id)}>Salvar</button>
+                    <button className="btn btn-ghost" onClick={cancelEdit}>Cancelar</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <strong>{t.desc}</strong>
+                    <div style={{ color: '#726c62', fontSize: 12 }}>{t.type === 'receita' ? 'Receita' : 'Despesa'}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+                    <span className={`status-pill ${t.type === 'receita' ? 'success' : 'danger'}`}>
+                      {t.type === 'receita' ? 'R$ +' : 'R$ -'}{t.amount.toFixed(2)}
+                    </span>
+                    {(
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button 
+                          className="btn btn-ghost" 
+                          onClick={() => startEdit(t)}
+                          style={{ padding: '4px 8px', fontSize: 12, color: '#4a90e2' }}
+                        >
+                          ✎ Editar
+                        </button>
+                        <button 
+                          className="btn btn-ghost" 
+                          onClick={() => removeTx(t.id)}
+                          style={{ padding: '4px 8px', fontSize: 12, color: '#d64545' }}
+                        >
+                          ✕ Remover
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ul>
