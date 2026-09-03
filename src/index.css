@@ -188,10 +188,28 @@ h2, h3, h4 {
 }
 
 .metric-card {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
   background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,242,234,0.8));
   border: 1px solid rgba(128,112,96,0.14);
   border-radius: 18px;
   padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.metric-card:hover,
+.metric-card-selected {
+  border-color: rgba(27, 77, 46, 0.45);
+  box-shadow: 0 8px 18px rgba(27, 77, 46, 0.1);
+  transform: translateY(-1px);
+}
+
+.metric-card:focus-visible {
+  outline: 3px solid rgba(212, 139, 42, 0.45);
+  outline-offset: 2px;
 }
 
 .metric-card .label {
@@ -300,6 +318,7 @@ h2, h3, h4 {
 .cow-body { flex: 1; min-width: 0; }
 .cow-name { font-weight: 700; font-size: 0.98rem }
 .cow-meta { font-size: 12px; color: #6b6455; margin-top: 4px }
+.cow-description { font-size: 12px; line-height: 1.4; color: #4f594e; margin-top: 7px }
 .cow-actions { display:flex; gap:8px }
 .cow-actions .btn { padding:6px 10px; font-size:0.84rem }
 

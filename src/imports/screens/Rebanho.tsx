@@ -1,12 +1,24 @@
+import { useState } from 'react'
 import Card from '../components/Card'
 
-export default function Rebanho({ data, cows }: { data?: { name: string; value: number; color?: string }[]; cows?: { id: string; nome: string; litros: number; raca?: string; lactacao?: number }[] }) {
+type Cow = { id: string; nome: string; litros: number; raca?: string; lactacao?: number; categoria?: string }
+
+export default function Rebanho({ data, cows }: { data?: { name: string; value: number; color?: string }[]; cows?: Cow[] }) {
+  const [selectedCategory, setSelectedCategory] = useState('Em lactação')
   const summary = [
     { label: 'Em lactação', value: data?.find(d => d.name === 'Em lactação')?.value ?? 0, detail: 'produção ativa' },
     { label: 'Secas', value: data?.find(d => d.name === 'Secas')?.value ?? 0, detail: 'em recuperação' },
     { label: 'Novilhas', value: data?.find(d => d.name === 'Novilhas')?.value ?? 0, detail: 'pendentes' },
     { label: 'Bezerras', value: data?.find(d => d.name === 'Bezerras')?.value ?? 0, detail: 'crescimento' },
   ]
+  const selectedCows = (cows ?? []).filter(cow => cow.categoria === selectedCategory)
+
+  const getDescription = (cow: Cow) => {
+    if (selectedCategory === 'Em lactação') return `Produção ativa de ${cow.litros} L/dia e na ${cow.lactacao}ª lactação.`
+    if (selectedCategory === 'Secas') return 'Em período de recuperação, sem produção registrada no momento.'
+    if (selectedCategory === 'Novilhas') return `Animal em desenvolvimento, com ${cow.lactacao}ª lactação prevista.`
+    return 'Animal jovem em fase de crescimento e acompanhamento.'
+  }
 
   return (
     <Card>
@@ -21,11 +33,17 @@ export default function Rebanho({ data, cows }: { data?: { name: string; value: 
 
       <div className="metric-grid">
         {summary.map(item => (
-          <div key={item.label} className="metric-card">
+          <button
+            key={item.label}
+            type="button"
+            className={`metric-card ${selectedCategory === item.label ? 'metric-card-selected' : ''}`}
+            onClick={() => setSelectedCategory(item.label)}
+            aria-pressed={selectedCategory === item.label}
+          >
             <span className="label">{item.label}</span>
             <strong>{item.value}</strong>
             <small>{item.detail}</small>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -43,20 +61,22 @@ export default function Rebanho({ data, cows }: { data?: { name: string; value: 
         </div>
 
         <div className="sub-panel">
-          <h3>Vacas em destaque</h3>
+          <div className="section-header" style={{ marginBottom: 0 }}>
+            <h3>Animais: {selectedCategory}</h3>
+            <span className="status-pill info">{selectedCows.length} animal(is)</span>
+          </div>
           <div className="cow-grid">
-            {(cows ?? []).slice(0, 4).map(c => (
+            {selectedCows.map(c => (
               <div key={c.id} className="cow-card">
                 <div className="cow-avatar">{c.nome.split(' ').map(p => p[0]).join('').slice(0, 2)}</div>
                 <div className="cow-body">
                   <div className="cow-name">{c.nome} <span style={{ color: '#6b6455', fontWeight: 500 }}>· {c.id}</span></div>
                   <div className="cow-meta">{c.raca} · Lactação {c.lactacao} · {c.litros} L</div>
-                </div>
-                <div className="cow-actions">
-                  <button className="btn btn-ghost">Detalhes</button>
+                  <div className="cow-description">{getDescription(c)}</div>
                 </div>
               </div>
             ))}
+            {!selectedCows.length && <p className="muted">Nenhum animal cadastrado nesta categoria.</p>}
           </div>
         </div>
       </div>
