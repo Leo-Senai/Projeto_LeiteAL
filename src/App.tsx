@@ -105,7 +105,7 @@ const navItems = [
   { icon: '💰', label: 'Financeiro', id: 'financeiro' },
   { icon: '📅', label: 'Agenda', id: 'agenda' },
   { icon: '📈', label: 'Relatórios', id: 'relatorios' },
-  { icon: '🤖', label: 'Assistente IA', id: 'ia' },
+ 
 ]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -546,7 +546,7 @@ export default function App() {
                       <>
                         <StatCard icon="🥛" label="Produção Hoje" value={`${productionToday.toFixed(2)} L`} sub={productionToday ? `+ vs. ontem` : '—'} color={G} />
                         <StatCard icon="💵" label="Receita Hoje" value={`R$ ${revenueToday.toFixed(2)}`} sub={`R$ ${pricePerLiter.toFixed(2)}/L`} color={G} />
-                        <StatCard icon="💰" label="Lucro Hoje" value="R$ 1.220" sub="Margem 33,5%" color={AM} />
+                        <StatCard icon="💰" label="Faturamento Hoje" value={`R$ ${(productionToday * pricePerLiter).toFixed(2)}`} sub="Margem 33,5%" color={AM} />
                         <StatCard icon="🐄" label="Vacas em Lactação" value={`${lactacaoCount}`} sub="em rebanho" color={TEXT} />
                       </>
                     )

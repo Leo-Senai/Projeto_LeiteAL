@@ -1,173 +1,491 @@
 import { useState } from 'react'
 import Card from '../components/Card'
 
-type Transaction = { id: number; desc: string; amount: number; type: 'receita' | 'despesa' }
+type Category =
+  | 'Alimentação'
+  | 'Mão de obra'
+  | 'Sanidade e reprodução'
+  | 'Energia e combustível'
+  | 'Manutenção e depreciação'
 
-export default function Financeiro({ transactions, onAddTransaction }: { transactions?: Transaction[]; onAddTransaction?: (tx: { desc: string; amount: number; type: 'receita' | 'despesa' }) => void }) {
-  const [localTxs, setLocalTxs] = useState<Transaction[]>([])
-  const [desc, setDesc] = useState('')
-  const [amount, setAmount] = useState('')
-  const [type, setType] = useState<'receita' | 'despesa'>('receita')
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [editDesc, setEditDesc] = useState('')
-  const [editAmount, setEditAmount] = useState('')
-  const [editType, setEditType] = useState<'receita' | 'despesa'>('receita')
+type Expense = {
+  id: number
+  name: string
+  value: number
+  category: Category
+}
 
-  const txs = transactions ?? localTxs
+const categories: Category[] = [
+  'Alimentação',
+  'Mão de obra',
+  'Sanidade e reprodução',
+  'Energia e combustível',
+  'Manutenção e depreciação',
+]
 
-  function addTx() {
-    const val = parseFloat(amount)
-    if (!desc || Number.isNaN(val)) return
-    if (onAddTransaction) {
-      onAddTransaction({ desc, amount: val, type })
-    } else {
-      setLocalTxs(prev => [...prev, { id: Date.now(), desc, amount: val, type }])
+export default function Alimentacao() {
+  const [plans, setPlans] = useState<Expense[]>([
+    {
+      id: 1,
+      name: 'Ração 18%',
+      value: 2400,
+      category: 'Alimentação',
+    },
+    {
+      id: 2,
+      name: 'Silagem',
+      value: 1800,
+      category: 'Alimentação',
+    },
+    {
+      id: 3,
+      name: 'Funcionário',
+      value: 2500,
+      category: 'Mão de obra',
+    },
+    {
+      id: 4,
+      name: 'Vacinação',
+      value: 850,
+      category: 'Sanidade e reprodução',
+    },
+    {
+      id: 5,
+      name: 'Inseminação artificial',
+      value: 600,
+      category: 'Sanidade e reprodução',
+    },
+    {
+      id: 6,
+      name: 'Energia elétrica',
+      value: 700,
+      category: 'Energia e combustível',
+    },
+    {
+      id: 7,
+      name: 'Diesel',
+      value: 1200,
+      category: 'Energia e combustível',
+    },
+    {
+      id: 8,
+      name: 'Manutenção do trator',
+      value: 900,
+      category: 'Manutenção e depreciação',
+    },
+  ])
+
+  const [name, setName] = useState('')
+  const [value, setValue] = useState('')
+  const [category, setCategory] =
+    useState<Category>('Alimentação')
+
+  // Categoria que está sendo editada
+  const [editingCategory, setEditingCategory] =
+    useState<Category | null>(null)
+
+  // Calcula o total de uma categoria
+  function getCategoryTotal(categoryName: Category) {
+    return plans
+      .filter(plan => plan.category === categoryName)
+      .reduce((total, plan) => total + plan.value, 0)
+  }
+
+  // Calcula o custo total
+  const totalCost = plans.reduce(
+    (total, plan) => total + plan.value,
+    0
+  )
+
+  // Formatação em Real
+  function formatCurrency(value: number) {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+  }
+
+  // Adicionar lançamento
+  function addPlan() {
+    if (!name || !value) return
+
+    const numericValue = Number(
+      value.replace(',', '.')
+    )
+
+    if (isNaN(numericValue) || numericValue <= 0) {
+      return
     }
-    setDesc('')
-    setAmount('')
+
+    setPlans(prev => [
+      {
+        id: Date.now(),
+        name,
+        value: numericValue,
+        category,
+      },
+      ...prev,
+    ])
+
+    setName('')
+    setValue('')
   }
 
-  function removeTx(id: number) {
-    if (transactions) return
-    setLocalTxs(prev => prev.filter(t => t.id !== id))
+  // Remover lançamento
+  function removePlan(id: number) {
+    setPlans(prev =>
+      prev.filter(plan => plan.id !== id)
+    )
   }
 
-  function startEdit(t: Transaction) {
-    setEditingId(t.id)
-    setEditDesc(t.desc)
-    setEditAmount(t.amount.toString())
-    setEditType(t.type)
-  }
+  // Editar lançamento
+  function editPlan(id: number) {
+    const plan = plans.find(
+      plan => plan.id === id
+    )
 
-  function saveEdit(id: number) {
-    const val = parseFloat(editAmount)
-    if (!editDesc || Number.isNaN(val)) return
-    setLocalTxs(prev => prev.map(t => 
-      t.id === id ? { ...t, desc: editDesc, amount: val, type: editType } : t
-    ))
-    setEditingId(null)
-  }
+    if (!plan) return
 
-  function cancelEdit() {
-    setEditingId(null)
-  }
+    const newName = window.prompt(
+      'Nome da despesa:',
+      plan.name
+    )
 
-  const receitas = txs.filter(t => t.type === 'receita').reduce((s, t) => s + t.amount, 0)
-  const despesas = txs.filter(t => t.type === 'despesa').reduce((s, t) => s + t.amount, 0)
-  const balance = receitas - despesas
+    const newValue = window.prompt(
+      'Valor da despesa:',
+      String(plan.value)
+    )
+
+    if (!newName || !newValue) return
+
+    const numericValue = Number(
+      newValue.replace(',', '.')
+    )
+
+    if (isNaN(numericValue) || numericValue <= 0) {
+      return
+    }
+
+    setPlans(prev =>
+      prev.map(plan =>
+        plan.id === id
+          ? {
+              ...plan,
+              name: newName,
+              value: numericValue,
+            }
+          : plan
+      )
+    )
+  }
 
   return (
     <Card>
+
+      {/* CABEÇALHO */}
       <div className="section-header">
         <div>
-          <div className="eyebrow">Financeiro</div>
-          <h2>Fluxo financeiro</h2>
-        </div>
-        <span className="status-pill success">Saldo positivo</span>
-      </div>
-      <p className="muted">Receitas, despesas e fluxo de caixa.</p>
+          <div className="eyebrow">
+            Custos da propriedade
+          </div>
 
+          <h2>Controle de custos</h2>
+        </div>
+
+        <span className="status-pill warning">
+          {plans.length} lançamentos
+        </span>
+      </div>
+
+      <p className="muted">
+        Acompanhe os custos da propriedade por categoria.
+      </p>
+
+      {/* MÉTRICAS DINÂMICAS */}
       <div className="metric-grid">
+
         <div className="metric-card">
-          <span className="label">Receitas</span>
-          <strong>R$ {receitas.toFixed(2)}</strong>
-          <small>movimentações</small>
+          <span className="label">
+            Alimentação
+          </span>
+
+          <strong>
+            {formatCurrency(
+              getCategoryTotal('Alimentação')
+            )}
+          </strong>
+
+          <small>
+            custos registrados
+          </small>
         </div>
+
         <div className="metric-card">
-          <span className="label">Despesas</span>
-          <strong>R$ {despesas.toFixed(2)}</strong>
-          <small>gastos</small>
+          <span className="label">
+            Mão de obra
+          </span>
+
+          <strong>
+            {formatCurrency(
+              getCategoryTotal('Mão de obra')
+            )}
+          </strong>
+
+          <small>
+            custos registrados
+          </small>
         </div>
+
         <div className="metric-card">
-          <span className="label">Saldo</span>
-          <strong>R$ {balance.toFixed(2)}</strong>
-          <small>atual</small>
+          <span className="label">
+            Total
+          </span>
+
+          <strong>
+            {formatCurrency(totalCost)}
+          </strong>
+
+          <small>
+            custo total registrado
+          </small>
         </div>
+
       </div>
 
-      <div className="sub-panel" style={{ marginTop: 18 }}>
-        <h3>Adicionar movimento</h3>
+
+      {/* ADICIONAR LANÇAMENTO */}
+      <div
+        className="sub-panel"
+        style={{ marginTop: 18 }}
+      >
+
+        <h3>Adicionar custo</h3>
+
         <div className="controls">
-          <input className="input" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descrição" />
-          <input className="input" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Valor" style={{ width: 120 }} />
-          <select className="select" value={type} onChange={e => setType(e.target.value as any)} style={{ width: 140 }}>
-            <option value="receita">Receita</option>
-            <option value="despesa">Despesa</option>
+
+          {/* CATEGORIA */}
+          <select
+            className="input"
+            value={category}
+            onChange={e =>
+              setCategory(
+                e.target.value as Category
+              )
+            }
+          >
+
+            {categories.map(categoryItem => (
+              <option
+                key={categoryItem}
+                value={categoryItem}
+              >
+                {categoryItem}
+              </option>
+            ))}
+
           </select>
-          <button className="btn btn-primary" onClick={addTx}>Adicionar</button>
+
+
+          {/* DESCRIÇÃO */}
+          <input
+            className="input"
+            value={name}
+            onChange={e =>
+              setName(e.target.value)
+            }
+            placeholder="Descrição"
+          />
+
+
+          {/* VALOR */}
+          <input
+            className="input"
+            value={value}
+            onChange={e =>
+              setValue(e.target.value)
+            }
+            placeholder="Valor (R$)"
+          />
+
+
+          {/* BOTÃO */}
+          <button
+            className="btn btn-primary"
+            onClick={addPlan}
+          >
+            Adicionar
+          </button>
+
         </div>
+
       </div>
 
-      <div className="sub-panel" style={{ marginTop: 18 }}>
-        <h3>Movimentações</h3>
-        <ul className="list">
-          {txs.length === 0 && <div className="empty-state">Nenhuma movimentação registrada.</div>}
-          {txs.map(t => (
-            <li key={t.id} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
-              {editingId === t.id ? (
-                <>
-                  <div className="controls" style={{ width: '100%', gap: 8 }}>
-                    <input 
-                      className="input" 
-                      value={editDesc} 
-                      onChange={e => setEditDesc(e.target.value)} 
-                      placeholder="Descrição" 
-                    />
-                    <input 
-                      className="input" 
-                      value={editAmount} 
-                      onChange={e => setEditAmount(e.target.value)} 
-                      placeholder="Valor" 
-                      style={{ width: 120 }} 
-                    />
-                    <select 
-                      className="select" 
-                      value={editType} 
-                      onChange={e => setEditType(e.target.value as any)} 
-                      style={{ width: 140 }}
-                    >
-                      <option value="receita">Receita</option>
-                      <option value="despesa">Despesa</option>
-                    </select>
-                    <button className="btn btn-primary" onClick={() => saveEdit(t.id)}>Salvar</button>
-                    <button className="btn btn-ghost" onClick={cancelEdit}>Cancelar</button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <strong>{t.desc}</strong>
-                    <div style={{ color: '#726c62', fontSize: 12 }}>{t.type === 'receita' ? 'Receita' : 'Despesa'}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-                    <span className={`status-pill ${t.type === 'receita' ? 'success' : 'danger'}`}>
-                      {t.type === 'receita' ? 'R$ +' : 'R$ -'}{t.amount.toFixed(2)}
-                    </span>
-                    {(
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button 
-                          className="btn btn-ghost" 
-                          onClick={() => startEdit(t)}
-                          style={{ padding: '4px 8px', fontSize: 12, color: '#4a90e2' }}
-                        >
-                          ✎ Editar
-                        </button>
-                        <button 
-                          className="btn btn-ghost" 
-                          onClick={() => removeTx(t.id)}
-                          style={{ padding: '4px 8px', fontSize: 12, color: '#d64545' }}
-                        >
-                          ✕ Remover
-                        </button>
-                      </div>
+
+      {/* CATEGORIAS */}
+      <div style={{ marginTop: 24 }}>
+
+        {categories.map(categoryItem => {
+
+          const items = plans.filter(
+            plan =>
+              plan.category === categoryItem
+          )
+
+          const categoryTotal =
+            getCategoryTotal(categoryItem)
+
+          const isEditing =
+            editingCategory === categoryItem
+
+          return (
+
+            <div
+              className="sub-panel"
+              style={{ marginTop: 18 }}
+              key={categoryItem}
+            >
+
+              {/* CABEÇALHO DA CATEGORIA */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent:
+                    'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}
+              >
+
+                <div>
+
+                  <h3>
+                    {categoryItem}
+                  </h3>
+
+                  <small
+                    style={{
+                      color: '#726c62',
+                    }}
+                  >
+                    Total:{' '}
+                    {formatCurrency(
+                      categoryTotal
                     )}
-                  </div>
-                </>
+                  </small>
+
+                </div>
+
+
+                {/* BOTÃO EDITAR CATEGORIA */}
+                <button
+                  className="btn btn-ghost"
+                  onClick={() =>
+                    setEditingCategory(
+                      isEditing
+                        ? null
+                        : categoryItem
+                    )
+                  }
+                >
+                  {isEditing
+                    ? 'Concluir'
+                    : 'Editar'}
+                </button>
+
+              </div>
+
+
+              {/* SEM LANÇAMENTOS */}
+              {items.length === 0 && (
+
+                <p className="muted">
+                  Nenhum custo registrado nesta categoria.
+                </p>
+
               )}
-            </li>
-          ))}
-        </ul>
+
+
+              {/* LISTA DE LANÇAMENTOS */}
+              {items.length > 0 && (
+
+                <ul className="list">
+
+                  {items.map(item => (
+
+                    <li key={item.id}>
+
+                      <div>
+
+                        <strong>
+                          {item.name}
+                        </strong>
+
+                        <div
+                          style={{
+                            color: '#726c62',
+                            fontSize: 12,
+                          }}
+                        >
+                          {formatCurrency(
+                            item.value
+                          )}
+                        </div>
+
+                      </div>
+
+
+                      {/* BOTÕES APARECEM APENAS AO EDITAR */}
+                      {isEditing && (
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: 8,
+                          }}
+                        >
+
+                          <button
+                            className="btn btn-ghost"
+                            onClick={() =>
+                              editPlan(
+                                item.id
+                              )
+                            }
+                          >
+                            Alterar
+                          </button>
+
+
+                          <button
+                            className="btn btn-ghost"
+                            onClick={() =>
+                              removePlan(
+                                item.id
+                              )
+                            }
+                          >
+                            Remover
+                          </button>
+
+                        </div>
+
+                      )}
+
+                    </li>
+
+                  ))}
+
+                </ul>
+
+              )}
+
+            </div>
+
+          )
+        })}
+
       </div>
+
     </Card>
   )
 }
