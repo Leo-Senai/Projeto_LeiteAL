@@ -7,6 +7,7 @@ type Cow = {
   litros: number
   raca?: string
   lactacao?: number
+  categoria?: string
 }
 
 type Appointment = {
@@ -29,6 +30,7 @@ export default function Reproducao({
   const [note, setNote] = useState('')
   const [tipo, setTipo] = useState('Inseminação')
   const [search, setSearch] = useState('')
+  const [appointmentFilter, setAppointmentFilter] = useState('todos')
 
   const [appointments, setAppointments] =
     useState<Appointment[]>([
@@ -88,66 +90,45 @@ export default function Reproducao({
       },
     ])
 
-  // =========================================================
-  // VACAS FILTRADAS E ORDENADAS
-  // =========================================================
-
   const sortedCows = useMemo(() => {
+    const text = search.trim().toLowerCase()
+
     return [...cows]
       .filter(cow => {
-        const searchText = search.toLowerCase()
+        if (!text) return true
 
         return (
-          cow.nome
-            .toLowerCase()
-            .includes(searchText) ||
-          cow.id
-            .toLowerCase()
-            .includes(searchText)
+          cow.nome.toLowerCase().includes(text) ||
+          cow.id.toLowerCase().includes(text) ||
+          (cow.raca || '').toLowerCase().includes(text)
         )
       })
-      .sort((a, b) =>
-        a.nome.localeCompare(
-          b.nome,
-          'pt-BR'
-        )
-      )
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   }, [cows, search])
 
-  // =========================================================
-  // AGENDAMENTOS ORDENADOS
-  // =========================================================
-
   const sortedAppointments = useMemo(() => {
-    return [...appointments].sort(
-      (a, b) =>
-        new Date(a.data).getTime() -
-        new Date(b.data).getTime()
-    )
-  }, [appointments])
+    return [...appointments]
+      .filter(item => {
+        if (appointmentFilter === 'todos') return true
+        return item.status === appointmentFilter
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.data).getTime() -
+          new Date(b.data).getTime()
+      )
+  }, [appointments, appointmentFilter])
 
-  // =========================================================
-  // VACA SELECIONADA
-  // =========================================================
-
-  const selectedCow = useMemo(() => {
-    return cows.find(
-      cow => cow.id === selected
-    )
-  }, [cows, selected])
-
-  // =========================================================
-  // HISTÓRICO DA VACA SELECIONADA
-  // =========================================================
+  const selectedCow = useMemo(
+    () => cows.find(cow => cow.id === selected),
+    [cows, selected]
+  )
 
   const selectedCowHistory = useMemo(() => {
     if (!selected) return []
 
     return [...appointments]
-      .filter(
-        appointment =>
-          appointment.animalId === selected
-      )
+      .filter(item => item.animalId === selected)
       .sort(
         (a, b) =>
           new Date(b.data).getTime() -
@@ -155,9 +136,63 @@ export default function Reproducao({
       )
   }, [appointments, selected])
 
-  // =========================================================
-  // FORMATAR DATA
-  // =========================================================
+  const pendingAppointments = appointments.filter(
+    item => item.status !== 'Realizado'
+  ).length
+
+  const completedAppointments = appointments.filter(
+    item => item.status === 'Realizado'
+  ).length
+
+  const inseminations = appointments.filter(
+    item => item.tipo === 'Inseminação'
+  ).length
+
+  const diagnostics = appointments.filter(
+    item => item.tipo === 'Diagnóstico'
+  ).length
+
+  const pregnancies = appointments.filter(
+    item => item.tipo === 'Gestação'
+  ).length
+
+  const nextAppointment = useMemo(
+    () =>
+      [...appointments]
+        .filter(item => item.status !== 'Realizado')
+        .sort(
+          (a, b) =>
+            new Date(a.data).getTime() -
+            new Date(b.data).getTime()
+        )[0],
+    [appointments]
+  )
+
+  const historyInseminations = selectedCowHistory.filter(
+    item => item.tipo === 'Inseminação'
+  ).length
+
+  const historyDiagnostics = selectedCowHistory.filter(
+    item => item.tipo === 'Diagnóstico'
+  ).length
+
+  const historyPregnancies = selectedCowHistory.filter(
+    item => item.tipo === 'Gestação'
+  ).length
+
+  const historyBirths = selectedCowHistory.filter(
+    item => item.tipo === 'Parto'
+  ).length
+
+  function getInitials(name: string) {
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .map(part => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase()
+  }
 
   function formatDate(dateString: string) {
     if (!dateString) return '-'
@@ -166,10 +201,6 @@ export default function Reproducao({
       `${dateString}T12:00:00`
     ).toLocaleDateString('pt-BR')
   }
-
-  // =========================================================
-  // SELECIONAR / DESELECIONAR VACA
-  // =========================================================
 
   function selectCow(cowId: string) {
     if (selected === cowId) {
@@ -180,23 +211,14 @@ export default function Reproducao({
     setSelected(cowId)
 
     setTimeout(() => {
-      const element =
-        document.getElementById(
-          'historico-reprodutivo'
-        )
-
-      if (element) {
-        element.scrollIntoView({
+      document
+        .getElementById('historico-reprodutivo')
+        ?.scrollIntoView({
           behavior: 'smooth',
           block: 'start',
         })
-      }
     }, 100)
   }
-
-  // =========================================================
-  // AGENDAR PROCEDIMENTO
-  // =========================================================
 
   function schedule() {
     if (!selected) {
@@ -209,9 +231,7 @@ export default function Reproducao({
       return
     }
 
-    const cow = cows.find(
-      item => item.id === selected
-    )
+    const cow = cows.find(item => item.id === selected)
 
     if (!cow) {
       alert('Animal não encontrado.')
@@ -224,742 +244,965 @@ export default function Reproducao({
       animal: cow.nome,
       tipo,
       data: date,
-      observacao:
-        note || 'Sem observação',
+      observacao: note.trim() || 'Sem observação',
       status: 'Agendado',
     }
 
-    setAppointments(prev => [
-      ...prev,
-      newAppointment,
-    ])
-
+    setAppointments(prev => [...prev, newAppointment])
     setDate('')
     setNote('')
     setTipo('Inseminação')
 
-    alert(
-      'Procedimento agendado com sucesso!'
-    )
+    alert('Procedimento agendado com sucesso!')
   }
-
-  // =========================================================
-  // REMOVER PROCEDIMENTO
-  // =========================================================
 
   function removeAppointment(id: number) {
-    const confirmDelete =
-      window.confirm(
-        'Deseja remover este procedimento?'
-      )
-
-    if (!confirmDelete) return
+    if (!window.confirm('Deseja remover este procedimento?')) return
 
     setAppointments(prev =>
-      prev.filter(
-        appointment =>
-          appointment.id !== id
-      )
+      prev.filter(item => item.id !== id)
     )
   }
-
-  // =========================================================
-  // CONCLUIR PROCEDIMENTO
-  // =========================================================
 
   function completeAppointment(id: number) {
     setAppointments(prev =>
-      prev.map(appointment =>
-        appointment.id === id
-          ? {
-              ...appointment,
-              status: 'Realizado',
-            }
-          : appointment
+      prev.map(item =>
+        item.id === id
+          ? { ...item, status: 'Realizado' }
+          : item
       )
     )
   }
-
-  // =========================================================
-  // MÉTRICAS
-  // =========================================================
-
-  const totalCows = cows.length
-
-  const inseminations =
-    appointments.filter(
-      appointment =>
-        appointment.tipo ===
-        'Inseminação'
-    ).length
-
-  const diagnostics =
-    appointments.filter(
-      appointment =>
-        appointment.tipo ===
-        'Diagnóstico'
-    ).length
-
-  const pregnancies =
-    appointments.filter(
-      appointment =>
-        appointment.tipo ===
-        'Gestação'
-    ).length
-
-  const nextAppointment =
-    sortedAppointments.find(
-      appointment =>
-        appointment.status !==
-        'Realizado'
-    )
-
-  // =========================================================
-  // CONTADORES DA VACA
-  // =========================================================
-
-  const historyInseminations =
-    selectedCowHistory.filter(
-      item =>
-        item.tipo === 'Inseminação'
-    ).length
-
-  const historyDiagnostics =
-    selectedCowHistory.filter(
-      item =>
-        item.tipo === 'Diagnóstico'
-    ).length
-
-  const historyPregnancies =
-    selectedCowHistory.filter(
-      item =>
-        item.tipo === 'Gestação'
-    ).length
-
-  const historyBirths =
-    selectedCowHistory.filter(
-      item =>
-        item.tipo === 'Parto'
-    ).length
 
   return (
     <Card>
       <style>{`
-        .reproducao-page {
-          width: 100%;
+        .repro-page {
+          --repro-green: #1b5e35;
+          --repro-green-dark: #154d2b;
+          --repro-green-soft: #e8f2eb;
+          --repro-beige: #f5f0e8;
+          --repro-border: #e3ded4;
+          --repro-muted: #7a7568;
+          --repro-text: #1a1a14;
+          --repro-orange: #d48b2a;
+          --repro-red: #c0392b;
         }
 
-        .table-header {
+        .repro-hero {
+          position: relative;
+          overflow: hidden;
+          padding: 26px;
+          border-radius: 20px;
+          color: white;
+          background:
+            radial-gradient(circle at 90% 15%, rgba(255,255,255,.16), transparent 28%),
+            linear-gradient(135deg, var(--repro-green-dark), var(--repro-green));
+          box-shadow: 0 14px 34px rgba(27,94,53,.14);
+        }
+
+        .repro-hero::after {
+          content: '';
+          position: absolute;
+          right: -70px;
+          bottom: -100px;
+          width: 220px;
+          height: 220px;
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 50%;
+          box-shadow:
+            0 0 0 28px rgba(255,255,255,.035),
+            0 0 0 56px rgba(255,255,255,.025);
+        }
+
+        .repro-hero-content {
+          position: relative;
+          z-index: 1;
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 20px;
-          margin-bottom: 18px;
         }
 
-        .table-header h3 {
+        .repro-eyebrow {
+          margin-bottom: 6px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: .14em;
+          text-transform: uppercase;
+          opacity: .72;
+        }
+
+        .repro-title {
           margin: 0;
+          font-size: 27px;
+          line-height: 1.15;
+          letter-spacing: -.03em;
         }
 
-        .table-subtitle {
-          display: block;
-          margin-top: 5px;
+        .repro-subtitle {
+          max-width: 680px;
+          margin: 8px 0 0;
+          color: rgba(255,255,255,.78);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .repro-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 13px;
+          border: 1px solid rgba(255,255,255,.18);
+          border-radius: 999px;
+          background: rgba(255,255,255,.10);
           font-size: 12px;
-          color: #8a847a;
+          font-weight: 800;
+          white-space: nowrap;
         }
 
-        .search-input {
-          max-width: 280px;
+        .repro-status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #b9e3c3;
+          box-shadow: 0 0 0 4px rgba(185,227,195,.12);
         }
 
-        .table-container {
+        .repro-metrics {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+          margin-top: 18px;
+        }
+
+        .repro-metric {
+          position: relative;
+          overflow: hidden;
+          min-height: 108px;
+          padding: 18px;
+          border: 1px solid var(--repro-border);
+          border-radius: 16px;
+          background: white;
+          box-shadow: 0 7px 22px rgba(26,26,20,.045);
+        }
+
+        .repro-metric::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          bottom: 0;
+          width: 52px;
+          height: 3px;
+          background: var(--repro-green);
+          border-radius: 0 5px 0 0;
+        }
+
+        .repro-metric-label {
+          display: block;
+          color: var(--repro-muted);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: .06em;
+          text-transform: uppercase;
+        }
+
+        .repro-metric-value {
+          display: block;
+          margin-top: 8px;
+          color: var(--repro-green-dark);
+          font-size: 25px;
+          font-weight: 900;
+          letter-spacing: -.03em;
+        }
+
+        .repro-metric-note {
+          display: block;
+          margin-top: 4px;
+          color: #969084;
+          font-size: 11px;
+        }
+
+        .repro-section {
+          margin-top: 18px;
+          padding: 20px;
+          border: 1px solid var(--repro-border);
+          border-radius: 18px;
+          background: white;
+          box-shadow: 0 7px 22px rgba(26,26,20,.04);
+        }
+
+        .repro-section-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 15px;
+          margin-bottom: 16px;
+        }
+
+        .repro-section-title {
+          margin: 0;
+          color: #292720;
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .repro-section-description {
+          display: block;
+          margin-top: 4px;
+          color: var(--repro-muted);
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .repro-form {
+          display: grid;
+          grid-template-columns: 1.25fr .9fr .9fr 1.6fr auto;
+          gap: 11px;
+          align-items: end;
+        }
+
+        .repro-label {
+          display: block;
+          margin-bottom: 7px;
+          color: #625d55;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: .05em;
+          text-transform: uppercase;
+        }
+
+        .repro-field {
+          width: 100%;
+          min-width: 0;
+          min-height: 42px;
+          box-sizing: border-box;
+          padding: 10px 12px;
+          border: 1px solid #dcd7ce;
+          border-radius: 10px;
+          outline: none;
+          background: white;
+          color: var(--repro-text);
+          font: inherit;
+          font-size: 13px;
+          transition: .16s ease;
+        }
+
+        .repro-field:focus {
+          border-color: var(--repro-green);
+          box-shadow: 0 0 0 3px rgba(27,94,53,.10);
+        }
+
+        .repro-primary-btn {
+          min-height: 42px;
+          padding: 0 17px;
+          border: 0;
+          border-radius: 10px;
+          background: var(--repro-green);
+          color: white;
+          cursor: pointer;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 900;
+          box-shadow: 0 7px 15px rgba(27,94,53,.15);
+          white-space: nowrap;
+          transition: .16s ease;
+        }
+
+        .repro-primary-btn:hover {
+          transform: translateY(-1px);
+          background: var(--repro-green-dark);
+        }
+
+        .repro-search {
+          width: 290px;
+          max-width: 100%;
+        }
+
+        .repro-table-wrap {
           width: 100%;
           overflow-x: auto;
-          border-radius: 16px;
           border: 1px solid #e8e4dc;
-          background: #ffffff;
-          box-shadow:
-            0 8px 24px
-            rgba(0, 0, 0, 0.04);
+          border-radius: 14px;
         }
 
-        .modern-table {
+        .repro-table {
           width: 100%;
           min-width: 850px;
-          border-collapse: separate;
-          border-spacing: 0;
+          border-collapse: collapse;
         }
 
-        .modern-table thead {
-          background:
-            linear-gradient(
-              90deg,
-              #f8f6f1,
-              #f3f0e9
-            );
-        }
-
-        .modern-table th {
-          padding: 16px 18px;
+        .repro-table th {
+          padding: 12px 14px;
+          background: #f8f6f1;
+          border-bottom: 1px solid #e8e4dc;
+          color: #777166;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: .07em;
           text-align: left;
-          font-size: 11px;
-          font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.6px;
-          color: #726c62;
-          border-bottom:
-            1px solid #e8e4dc;
+          white-space: nowrap;
         }
 
-        .modern-table td {
-          padding: 18px;
-          border-bottom:
-            1px solid #f0ede7;
+        .repro-table td {
+          padding: 13px 14px;
+          border-bottom: 1px solid #f0ede7;
           vertical-align: middle;
+          font-size: 13px;
         }
 
-        .modern-table tbody tr {
-          transition:
-            all 0.2s ease;
+        .repro-table tbody tr {
+          transition: background .15s ease;
         }
 
-        .modern-table tbody tr:hover {
-          background: #faf9f6;
+        .repro-table tbody tr:hover {
+          background: #fbfcfa;
         }
 
-        .modern-table tbody tr:last-child td {
-          border-bottom: none;
+        .repro-table tbody tr:last-child td {
+          border-bottom: 0;
         }
 
-        .selected-row {
+        .repro-selected-row {
           background: #f0f7f1 !important;
         }
 
-        .animal-cell {
+        .repro-animal {
           display: flex;
           align-items: center;
-          gap: 12px;
-        }
-
-        .animal-avatar {
-          width: 42px;
-          height: 42px;
-          min-width: 42px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background:
-            linear-gradient(
-              135deg,
-              #4f8a5b,
-              #2f6b3b
-            );
-          color: white;
-          font-size: 13px;
-          font-weight: 700;
-          box-shadow:
-            0 4px 10px
-            rgba(47, 107, 59, 0.2);
-        }
-
-        .animal-cell strong {
-          display: block;
-          color: #2b2925;
-          font-size: 14px;
-        }
-
-        .animal-cell span {
-          display: block;
-          margin-top: 3px;
-          font-size: 11px;
-          color: #8a847a;
-        }
-
-        .id-badge {
-          display: inline-flex;
-          align-items: center;
-          padding: 6px 10px;
-          border-radius: 8px;
-          background: #f2f1ed;
-          color: #625d55;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .race-text {
-          font-size: 13px;
-          color: #4f4a43;
-        }
-
-        .lactation-badge {
-          display: inline-flex;
-          padding: 6px 10px;
-          border-radius: 8px;
-          background: #eef6ef;
-          color: #397344;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .production-cell strong {
-          display: block;
-          color: #2f6b3b;
-          font-size: 16px;
-        }
-
-        .production-cell span {
-          font-size: 11px;
-          color: #8a847a;
-        }
-
-        .procedure-badge {
-          display: inline-flex;
-          padding: 7px 11px;
-          border-radius: 8px;
-          background: #eef4ff;
-          color: #4169a1;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .status-realizado {
-          display: inline-flex;
-          padding: 6px 10px;
-          border-radius: 8px;
-          background: #eaf6ed;
-          color: #397344;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .status-agendado {
-          display: inline-flex;
-          padding: 6px 10px;
-          border-radius: 8px;
-          background: #fff5e6;
-          color: #a66a18;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .action-column {
-          text-align: right !important;
-        }
-
-        .select-cow-btn {
-          border: none;
-          padding: 9px 16px;
-          border-radius: 9px;
-          background:
-            linear-gradient(
-              135deg,
-              #3d7a49,
-              #2f653b
-            );
-          color: white;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          transition:
-            all 0.2s ease;
-          box-shadow:
-            0 4px 10px
-            rgba(47, 107, 59, 0.2);
-        }
-
-        .select-cow-btn:hover {
-          transform:
-            translateY(-2px);
-        }
-
-        .select-cow-btn.selected {
-          background: #c98b32;
-        }
-
-        .remove-btn {
-          border:
-            1px solid #f1caca;
-          background:
-            #fff7f7;
-          color:
-            #b94b4b;
-          padding:
-            8px 14px;
-          border-radius:
-            8px;
-          font-size:
-            12px;
-          font-weight:
-            600;
-          cursor:
-            pointer;
-        }
-
-        .remove-btn:hover {
-          background:
-            #ffeaea;
-        }
-
-        .complete-btn {
-          border: 1px solid #cce3d0;
-          background: #f1faf3;
-          color: #397344;
-          padding: 8px 12px;
-          border-radius: 8px;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          margin-right: 6px;
-        }
-
-        .complete-btn:hover {
-          background: #e4f4e7;
-        }
-
-        .empty-table {
-          text-align: center;
-          padding: 45px !important;
-          color: #8a847a;
-          font-size: 14px;
-        }
-
-        /* HISTÓRICO */
-
-        .history-panel {
-          margin-top: 20px;
-          padding: 24px;
-          border-radius: 18px;
-          border: 1px solid #dce9df;
-          background:
-            linear-gradient(
-              135deg,
-              #f7fbf7,
-              #ffffff
-            );
-          box-shadow:
-            0 10px 30px
-            rgba(42, 91, 52, 0.08);
-          scroll-margin-top: 20px;
-        }
-
-        .history-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
-          margin-bottom: 20px;
-        }
-
-        .history-title {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-
-        .history-big-avatar {
-          width: 58px;
-          height: 58px;
-          border-radius: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background:
-            linear-gradient(
-              135deg,
-              #3f7b4b,
-              #285d34
-            );
-          color: white;
-          font-weight: 800;
-          font-size: 17px;
-        }
-
-        .history-title h3 {
-          margin: 0;
-          color: #263126;
-        }
-
-        .history-title p {
-          margin: 5px 0 0;
-          color: #77736b;
-          font-size: 13px;
-        }
-
-        .close-history {
-          border: 1px solid #ddd8ce;
-          background: white;
-          color: #625d55;
-          border-radius: 9px;
-          padding: 8px 13px;
-          cursor: pointer;
-          font-weight: 600;
-        }
-
-        .history-metrics {
-          display: grid;
-          grid-template-columns:
-            repeat(4, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 22px;
-        }
-
-        .history-metric {
-          padding: 15px;
-          background: white;
-          border: 1px solid #e8e5df;
-          border-radius: 12px;
-        }
-
-        .history-metric span {
-          display: block;
-          font-size: 11px;
-          color: #858078;
-          text-transform: uppercase;
-          font-weight: 700;
-        }
-
-        .history-metric strong {
-          display: block;
-          margin-top: 7px;
-          font-size: 22px;
-          color: #2f6b3b;
-        }
-
-        .history-section-title {
-          margin: 0 0 12px;
-          color: #302e29;
-          font-size: 15px;
-        }
-
-        .history-list {
-          display: flex;
-          flex-direction: column;
           gap: 10px;
         }
 
-        .history-item {
-          display: grid;
-          grid-template-columns:
-            105px 150px 1fr auto;
+        .repro-avatar {
+          width: 42px;
+          height: 42px;
+          flex: 0 0 42px;
+          display: flex;
           align-items: center;
-          gap: 15px;
-          padding: 14px 16px;
-          background: white;
-          border: 1px solid #ebe8e2;
-          border-radius: 11px;
+          justify-content: center;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #e8f2eb, #cfe3d4);
+          color: var(--repro-green-dark);
+          font-size: 12px;
+          font-weight: 900;
         }
 
-        .history-date {
-          font-weight: 700;
-          color: #49453e;
-          font-size: 13px;
+        .repro-avatar.large {
+          width: 58px;
+          height: 58px;
+          flex-basis: 58px;
+          border-radius: 16px;
+          background: linear-gradient(135deg, var(--repro-green), #285d34);
+          color: white;
+          font-size: 16px;
+          box-shadow: 0 7px 16px rgba(27,94,53,.16);
         }
 
-        .history-type {
+        .repro-animal-name {
+          display: block;
+          color: #28261f;
+          font-weight: 900;
+        }
+
+        .repro-animal-meta {
+          display: block;
+          margin-top: 3px;
+          color: #928b80;
+          font-size: 10px;
+        }
+
+        .repro-id {
           display: inline-flex;
-          width: fit-content;
-          padding: 6px 9px;
+          padding: 5px 8px;
           border-radius: 7px;
-          background: #eef5ef;
+          background: #f2f1ed;
+          color: #625d55;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .repro-production {
+          color: var(--repro-green-dark);
+          font-weight: 900;
+        }
+
+        .repro-lactation {
+          display: inline-flex;
+          padding: 6px 9px;
+          border-radius: 8px;
+          background: #eef6ef;
           color: #397344;
           font-size: 11px;
-          font-weight: 700;
+          font-weight: 800;
         }
 
-        .history-note {
-          color: #6f6a61;
+        .repro-select-btn,
+        .repro-complete-btn,
+        .repro-remove-btn,
+        .repro-close-btn {
+          border-radius: 9px;
+          padding: 8px 11px;
+          cursor: pointer;
+          font: inherit;
+          font-size: 11px;
+          font-weight: 800;
+          transition: .16s ease;
+        }
+
+        .repro-select-btn {
+          border: 0;
+          background: var(--repro-green);
+          color: white;
+        }
+
+        .repro-select-btn:hover {
+          transform: translateY(-1px);
+          background: var(--repro-green-dark);
+        }
+
+        .repro-select-btn.selected {
+          background: var(--repro-orange);
+        }
+
+        .repro-complete-btn {
+          border: 1px solid #cce3d0;
+          background: #f1faf3;
+          color: #397344;
+        }
+
+        .repro-remove-btn {
+          border: 1px solid #f1caca;
+          background: #fff7f7;
+          color: #b94b4b;
+        }
+
+        .repro-remove-btn:hover {
+          background: #ffeaea;
+        }
+
+        .repro-action-group {
+          display: flex;
+          justify-content: flex-end;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .repro-status {
+          display: inline-flex;
+          padding: 6px 9px;
+          border-radius: 8px;
+          font-size: 10px;
+          font-weight: 900;
+        }
+
+        .repro-status.realizado {
+          background: #eaf6ed;
+          color: #397344;
+        }
+
+        .repro-status.agendado {
+          background: #fff5e6;
+          color: #a66a18;
+        }
+
+        .repro-type {
+          display: inline-flex;
+          padding: 6px 9px;
+          border-radius: 8px;
+          background: #eef4ff;
+          color: #4169a1;
+          font-size: 10px;
+          font-weight: 900;
+        }
+
+        .repro-empty {
+          padding: 42px 20px !important;
+          color: #918a7f;
+          text-align: center;
+        }
+
+        .repro-empty-icon {
+          display: block;
+          margin-bottom: 7px;
+          font-size: 26px;
+        }
+
+        .repro-history {
+          scroll-margin-top: 20px;
+          border-color: #d7e7da;
+          background:
+            linear-gradient(135deg, #f7fbf7, #fff);
+        }
+
+        .repro-history-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+        }
+
+        .repro-history-title {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+        }
+
+        .repro-history-title h3 {
+          margin: 0;
+          color: #263126;
+          font-size: 17px;
+        }
+
+        .repro-history-title p {
+          margin: 5px 0 0;
+          color: #77736b;
           font-size: 12px;
         }
 
-        .no-history {
-          text-align: center;
-          padding: 30px;
+        .repro-close-btn {
+          border: 1px solid #ddd8ce;
           background: white;
-          border-radius: 12px;
-          border: 1px dashed #d8d4cc;
-          color: #888278;
-          font-size: 13px;
+          color: #625d55;
         }
 
-        .selected-info {
+        .repro-cow-summary {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
           margin-top: 16px;
-          padding: 12px 15px;
-          border-radius: 10px;
-          background: #edf7ef;
-          border: 1px solid #d5e9d9;
-          color: #397344;
-          font-size: 13px;
-          font-weight: 600;
         }
 
-        @media (max-width: 900px) {
-          .history-metrics {
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr));
+        .repro-summary-chip {
+          padding: 8px 10px;
+          border: 1px solid #d9e8dc;
+          border-radius: 9px;
+          background: white;
+          color: #397344;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .repro-history-metrics {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 10px;
+          margin-top: 16px;
+        }
+
+        .repro-history-metric {
+          padding: 14px;
+          border: 1px solid #e7e3dc;
+          border-radius: 12px;
+          background: white;
+        }
+
+        .repro-history-metric span {
+          display: block;
+          color: #858078;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: .05em;
+          text-transform: uppercase;
+        }
+
+        .repro-history-metric strong {
+          display: block;
+          margin-top: 6px;
+          color: var(--repro-green-dark);
+          font-size: 22px;
+        }
+
+        .repro-history-list {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+          margin-top: 14px;
+        }
+
+        .repro-history-item {
+          display: grid;
+          grid-template-columns: 105px 145px 1fr auto;
+          align-items: center;
+          gap: 14px;
+          padding: 13px 14px;
+          border: 1px solid #ebe8e2;
+          border-radius: 11px;
+          background: white;
+        }
+
+        .repro-history-date {
+          color: #49453e;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .repro-history-note {
+          color: #6f6a61;
+          font-size: 11px;
+          line-height: 1.45;
+        }
+
+        .repro-next {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 13px;
+          padding: 11px 13px;
+          border: 1px solid #e7dfcd;
+          border-radius: 10px;
+          background: #fffaf1;
+          color: #7a5a27;
+          font-size: 11px;
+          line-height: 1.45;
+        }
+
+        .repro-cow-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .repro-cow-card {
+          position: relative;
+          padding: 15px;
+          border: 1px solid #e6e1d8;
+          border-radius: 16px;
+          background: white;
+          cursor: pointer;
+          transition: .16s ease;
+        }
+
+        .repro-cow-card:hover {
+          transform: translateY(-2px);
+          border-color: #cdded1;
+          box-shadow: 0 10px 24px rgba(26,26,20,.055);
+        }
+
+        .repro-cow-card.selected {
+          border-color: #9fc2a7;
+          background: #f5faf6;
+          box-shadow: 0 0 0 3px rgba(27,94,53,.07);
+        }
+
+        .repro-card-top {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+        }
+
+        .repro-card-name {
+          color: #28261f;
+          font-weight: 900;
+        }
+
+        .repro-card-id {
+          margin-top: 3px;
+          color: #928b80;
+          font-size: 10px;
+        }
+
+        .repro-card-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-top: 13px;
+        }
+
+        .repro-card-stat {
+          padding: 9px;
+          border-radius: 10px;
+          background: #f8f6f1;
+        }
+
+        .repro-card-stat span {
+          display: block;
+          color: #918a7f;
+          font-size: 9px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+
+        .repro-card-stat strong {
+          display: block;
+          margin-top: 3px;
+          color: #353129;
+          font-size: 12px;
+        }
+
+        .repro-card-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          margin-top: 11px;
+          padding-top: 11px;
+          border-top: 1px solid #eeeae3;
+        }
+
+        .repro-card-footer span {
+          color: #8b8479;
+          font-size: 10px;
+        }
+
+        .repro-card-footer strong {
+          color: var(--repro-green-dark);
+          font-size: 13px;
+        }
+
+        @media (max-width: 1050px) {
+          .repro-metrics {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
-          .history-item {
+          .repro-form {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .repro-cow-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 800px) {
+          .repro-hero-content {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .repro-section {
+            padding: 15px;
+          }
+
+          .repro-section-head {
+            flex-direction: column;
+          }
+
+          .repro-search {
+            width: 100%;
+          }
+
+          .repro-history-header {
+            flex-direction: column;
+          }
+
+          .repro-history-metrics {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .repro-history-item {
             grid-template-columns: 1fr;
             gap: 8px;
           }
+
+          .repro-cow-grid {
+            grid-template-columns: 1fr;
+          }
         }
 
-        @media (max-width: 768px) {
-          .table-header {
-            flex-direction: column;
-            align-items: stretch;
+        @media (max-width: 600px) {
+          .repro-metrics {
+            grid-template-columns: 1fr;
           }
 
-          .search-input {
-            max-width: 100%;
+          .repro-form {
+            grid-template-columns: 1fr;
           }
 
-          .modern-table {
-            min-width: 850px;
-          }
-
-          .table-container {
-            border-radius: 12px;
-          }
-
-          .history-header {
-            align-items: flex-start;
-          }
-
-          .history-metrics {
+          .repro-history-metrics {
             grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
 
-      <div className="reproducao-page">
+      <div className="repro-page">
+        <section className="repro-hero">
+          <div className="repro-hero-content">
+            <div>
+              <div className="repro-eyebrow">
+                Reprodução bovina
+              </div>
 
-        {/* ================================================= */}
-        {/* CABEÇALHO */}
-        {/* ================================================= */}
+              <h2 className="repro-title">
+                Programa reprodutivo
+              </h2>
 
-        <div className="section-header">
-          <div>
-            <div className="eyebrow">
-              Reprodução
+              <p className="repro-subtitle">
+                Acompanhe cio, inseminações, diagnósticos,
+                gestações, partos e secagens de cada animal.
+              </p>
             </div>
 
-            <h2>
-              Programa reprodutivo
-            </h2>
+            <div className="repro-status">
+              <span className="repro-status-dot" />
+              {pendingAppointments} pendente(s)
+            </div>
           </div>
+        </section>
 
-          <span className="status-pill info">
-            {appointments.filter(
-              item =>
-                item.status !==
-                'Realizado'
-            ).length}{' '}
-            pendentes
-          </span>
-        </div>
-
-        <p className="muted">
-          Controle reprodutivo,
-          inseminações, diagnósticos,
-          gestações e acompanhamento
-          individual das vacas.
-        </p>
-
-        {/* ================================================= */}
-        {/* MÉTRICAS */}
-        {/* ================================================= */}
-
-        <div className="metric-grid">
-
-          <div className="metric-card">
-            <span className="label">
+        <section className="repro-metrics">
+          <div className="repro-metric">
+            <span className="repro-metric-label">
               Vacas cadastradas
             </span>
 
-            <strong>
-              {totalCows}
+            <strong className="repro-metric-value">
+              {cows.length}
             </strong>
 
-            <small>
+            <span className="repro-metric-note">
               disponíveis para acompanhamento
-            </small>
+            </span>
           </div>
 
-          <div className="metric-card">
-            <span className="label">
+          <div className="repro-metric">
+            <span className="repro-metric-label">
               Inseminações
             </span>
 
-            <strong>
+            <strong className="repro-metric-value">
               {inseminations}
             </strong>
 
-            <small>
-              procedimentos cadastrados
-            </small>
+            <span className="repro-metric-note">
+              procedimentos registrados
+            </span>
           </div>
 
-          <div className="metric-card">
-            <span className="label">
+          <div className="repro-metric">
+            <span className="repro-metric-label">
               Diagnósticos
             </span>
 
-            <strong>
+            <strong className="repro-metric-value">
               {diagnostics}
             </strong>
 
-            <small>
-              exames cadastrados
-            </small>
+            <span className="repro-metric-note">
+              acompanhamentos registrados
+            </span>
           </div>
 
-          <div className="metric-card">
-            <span className="label">
+          <div className="repro-metric">
+            <span className="repro-metric-label">
               Próximo procedimento
             </span>
 
-            <strong>
+            <strong className="repro-metric-value">
               {nextAppointment
-                ? formatDate(
-                    nextAppointment.data
-                  )
+                ? formatDate(nextAppointment.data)
                 : '-'}
             </strong>
 
-            <small>
+            <span className="repro-metric-note">
               {nextAppointment
-                ? nextAppointment.animal
+                ? `${nextAppointment.animal} · ${nextAppointment.tipo}`
                 : 'Nenhum agendamento'}
-            </small>
+            </span>
+          </div>
+        </section>
+
+        <section className="repro-section">
+          <div className="repro-section-head">
+            <div>
+              <h3 className="repro-section-title">
+                Agendar procedimento
+              </h3>
+
+              <span className="repro-section-description">
+                Selecione uma vaca e registre o próximo evento reprodutivo.
+              </span>
+            </div>
           </div>
 
-        </div>
+          <div className="repro-form">
+            <div>
+              <label className="repro-label">Animal</label>
 
-        {/* ================================================= */}
-        {/* HISTÓRICO DA VACA */}
-        {/* ================================================= */}
+              <select
+                className="repro-field"
+                value={selected}
+                onChange={e => setSelected(e.target.value)}
+              >
+                <option value="">
+                  Selecione uma vaca
+                </option>
+
+                {[...cows]
+                  .sort((a, b) =>
+                    a.nome.localeCompare(b.nome, 'pt-BR')
+                  )
+                  .map(cow => (
+                    <option key={cow.id} value={cow.id}>
+                      {cow.nome} · ID {cow.id}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="repro-label">
+                Procedimento
+              </label>
+
+              <select
+                className="repro-field"
+                value={tipo}
+                onChange={e => setTipo(e.target.value)}
+              >
+                <option>Inseminação</option>
+                <option>Diagnóstico</option>
+                <option>Cio</option>
+                <option>Gestação</option>
+                <option>Parto</option>
+                <option>Secagem</option>
+                <option>Outro</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="repro-label">Data</label>
+
+              <input
+                className="repro-field"
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="repro-label">
+                Observação
+              </label>
+
+              <input
+                className="repro-field"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="Ex.: acompanhar retorno de cio"
+              />
+            </div>
+
+            <button
+              type="button"
+              className="repro-primary-btn"
+              onClick={schedule}
+            >
+              + Agendar
+            </button>
+          </div>
+        </section>
 
         {selectedCow && (
-          <div
+          <section
             id="historico-reprodutivo"
-            className="history-panel"
+            className="repro-section repro-history"
           >
-
-            <div className="history-header">
-
-              <div className="history-title">
-
-                <div className="history-big-avatar">
-                  {selectedCow.nome
-                    .split(' ')
-                    .map(
-                      p => p[0]
-                    )
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase()}
+            <div className="repro-history-header">
+              <div className="repro-history-title">
+                <div className="repro-avatar large">
+                  {getInitials(selectedCow.nome)}
                 </div>
 
                 <div>
@@ -968,711 +1211,346 @@ export default function Reproducao({
                   </h3>
 
                   <p>
-                    {selectedCow.nome}
-                    {' · '}
-                    ID {selectedCow.id}
-                    {' · '}
-                    {selectedCow.raca ||
-                      'Raça não informada'}
+                    {selectedCow.nome} · ID {selectedCow.id} ·{' '}
+                    {selectedCow.raca || 'Raça não informada'}
                   </p>
                 </div>
-
               </div>
 
               <button
-                className="close-history"
-                onClick={() =>
-                  setSelected('')
-                }
+                type="button"
+                className="repro-close-btn"
+                onClick={() => setSelected('')}
               >
                 Fechar
               </button>
-
             </div>
 
-            {/* INFORMAÇÕES DA VACA */}
+            <div className="repro-cow-summary">
+              <span className="repro-summary-chip">
+                🐄 {selectedCow.litros} L/dia
+              </span>
 
-            <div className="selected-info">
-              🐄{' '}
-              <strong>
-                {selectedCow.nome}
-              </strong>
-              {' — '}
-              {selectedCow.lactacao
-                ? `${selectedCow.lactacao}ª lactação`
-                : 'Lactação não informada'}
-              {' · '}
-              Produção:
-              {' '}
-              {selectedCow.litros} L/dia
+              <span className="repro-summary-chip">
+                🔄 {selectedCow.lactacao
+                  ? `${selectedCow.lactacao}ª lactação`
+                  : 'Lactação não informada'}
+              </span>
+
+              {selectedCow.categoria && (
+                <span className="repro-summary-chip">
+                  {selectedCow.categoria}
+                </span>
+              )}
             </div>
 
-            {/* MÉTRICAS DO HISTÓRICO */}
-
-            <div className="history-metrics">
-
-              <div className="history-metric">
-                <span>
-                  Inseminações
-                </span>
-
-                <strong>
-                  {historyInseminations}
-                </strong>
+            <div className="repro-history-metrics">
+              <div className="repro-history-metric">
+                <span>Inseminações</span>
+                <strong>{historyInseminations}</strong>
               </div>
 
-              <div className="history-metric">
-                <span>
-                  Diagnósticos
-                </span>
-
-                <strong>
-                  {historyDiagnostics}
-                </strong>
+              <div className="repro-history-metric">
+                <span>Diagnósticos</span>
+                <strong>{historyDiagnostics}</strong>
               </div>
 
-              <div className="history-metric">
-                <span>
-                  Gestações
-                </span>
-
-                <strong>
-                  {historyPregnancies}
-                </strong>
+              <div className="repro-history-metric">
+                <span>Gestações</span>
+                <strong>{historyPregnancies}</strong>
               </div>
 
-              <div className="history-metric">
-                <span>
-                  Partos
-                </span>
-
-                <strong>
-                  {historyBirths}
-                </strong>
+              <div className="repro-history-metric">
+                <span>Partos</span>
+                <strong>{historyBirths}</strong>
               </div>
-
             </div>
-
-            {/* LISTA DO HISTÓRICO */}
-
-            <h4 className="history-section-title">
-              Histórico de procedimentos
-            </h4>
 
             {selectedCowHistory.length === 0 ? (
-
-              <div className="no-history">
-                📋 Nenhum procedimento
-                reprodutivo registrado
+              <div className="repro-empty">
+                <span className="repro-empty-icon">
+                  📋
+                </span>
+                Nenhum procedimento reprodutivo registrado
                 para esta vaca.
               </div>
-
             ) : (
-
-              <div className="history-list">
-
-                {selectedCowHistory.map(
-                  appointment => (
-
-                    <div
-                      key={appointment.id}
-                      className="history-item"
-                    >
-
-                      <div className="history-date">
-                        {formatDate(
-                          appointment.data
-                        )}
-                      </div>
-
-                      <div>
-                        <span className="history-type">
-                          {appointment.tipo}
-                        </span>
-                      </div>
-
-                      <div className="history-note">
-                        {appointment.observacao}
-                      </div>
-
-                      <div>
-                        {appointment.status ===
-                        'Realizado' ? (
-                          <span className="status-realizado">
-                            Realizado
-                          </span>
-                        ) : (
-                          <span className="status-agendado">
-                            Agendado
-                          </span>
-                        )}
-                      </div>
-
+              <div className="repro-history-list">
+                {selectedCowHistory.map(item => (
+                  <div
+                    key={item.id}
+                    className="repro-history-item"
+                  >
+                    <div className="repro-history-date">
+                      {formatDate(item.data)}
                     </div>
 
-                  )
-                )}
+                    <div>
+                      <span className="repro-type">
+                        {item.tipo}
+                      </span>
+                    </div>
 
+                    <div className="repro-history-note">
+                      {item.observacao}
+                    </div>
+
+                    <div>
+                      <span
+                        className={`repro-status ${
+                          item.status === 'Realizado'
+                            ? 'realizado'
+                            : 'agendado'
+                        }`}
+                      >
+                        {item.status || 'Agendado'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-
             )}
 
-          </div>
+            {selectedCowHistory.some(
+              item => item.status === 'Agendado'
+            ) && (
+              <div className="repro-next">
+                📅 <strong>Próximo acompanhamento:</strong>{' '}
+                existe pelo menos um procedimento agendado para
+                esta vaca.
+              </div>
+            )}
+          </section>
         )}
 
-        {/* ================================================= */}
-        {/* FORMULÁRIO */}
-        {/* ================================================= */}
-
-        <div
-          className="sub-panel"
-          style={{
-            marginTop: 20,
-          }}
-        >
-
-          <h3>
-            Agendar procedimento
-          </h3>
-
-          <div
-            className="controls"
-            style={{
-              marginTop: 16,
-            }}
-          >
-
-            <select
-              className="select"
-              value={selected}
-              onChange={e =>
-                setSelected(
-                  e.target.value
-                )
-              }
-            >
-
-              <option value="">
-                Selecione uma vaca
-              </option>
-
-              {sortedCows.map(cow => (
-
-                <option
-                  key={cow.id}
-                  value={cow.id}
-                >
-                  {cow.nome}
-                  {' · '}
-                  ID {cow.id}
-                </option>
-
-              ))}
-
-            </select>
-
-            <select
-              className="select"
-              value={tipo}
-              onChange={e =>
-                setTipo(
-                  e.target.value
-                )
-              }
-            >
-
-              <option>
-                Inseminação
-              </option>
-
-              <option>
-                Diagnóstico
-              </option>
-
-              <option>
-                Cio
-              </option>
-
-              <option>
-                Gestação
-              </option>
-
-              <option>
-                Parto
-              </option>
-
-              <option>
-                Secagem
-              </option>
-
-              <option>
-                Outro
-              </option>
-
-            </select>
-
-            <input
-              className="input"
-              type="date"
-              value={date}
-              onChange={e =>
-                setDate(
-                  e.target.value
-                )
-              }
-            />
-
-            <input
-              className="input"
-              value={note}
-              onChange={e =>
-                setNote(
-                  e.target.value
-                )
-              }
-              placeholder="Observação"
-            />
-
-            <button
-              className="btn btn-primary"
-              onClick={schedule}
-            >
-              Agendar
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* ================================================= */}
-        {/* TABELA DE VACAS */}
-        {/* ================================================= */}
-
-        <div
-          className="sub-panel"
-          style={{
-            marginTop: 20,
-          }}
-        >
-
-          <div className="table-header">
-
+        <section className="repro-section">
+          <div className="repro-section-head">
             <div>
-
-              <h3>
+              <h3 className="repro-section-title">
                 Vacas em acompanhamento
               </h3>
 
-              <span className="table-subtitle">
-                {sortedCows.length}
-                {' '}
-                animal(is)
-                encontrado(s)
+              <span className="repro-section-description">
+                {sortedCows.length} animal(is) encontrado(s).
+                Clique no card para abrir o histórico.
               </span>
-
             </div>
 
             <input
-              className="input search-input"
+              className="repro-field repro-search"
               value={search}
-              onChange={e =>
-                setSearch(
-                  e.target.value
-                )
-              }
-              placeholder="🔎 Buscar por nome ou ID"
+              onChange={e => setSearch(e.target.value)}
+              placeholder="🔎 Buscar nome, ID ou raça"
             />
-
           </div>
 
-          <div className="table-container">
-
-            <table className="modern-table">
-
-              <thead>
-
-                <tr>
-
-                  <th>
-                    Animal
-                  </th>
-
-                  <th>
-                    Identificação
-                  </th>
-
-                  <th>
-                    Raça
-                  </th>
-
-                  <th>
-                    Lactação
-                  </th>
-
-                  <th>
-                    Produção
-                  </th>
-
-                  <th className="action-column">
-                    Ações
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {sortedCows.length === 0 && (
-
-                  <tr>
-
-                    <td
-                      colSpan={6}
-                      className="empty-table"
-                    >
-                      🐄 Nenhum animal
-                      encontrado.
-                    </td>
-
-                  </tr>
-
-                )}
-
-                {sortedCows.map(cow => (
-
-                  <tr
-                    key={cow.id}
-                    className={
-                      selected === cow.id
-                        ? 'selected-row'
-                        : ''
+          {sortedCows.length === 0 ? (
+            <div className="repro-empty">
+              <span className="repro-empty-icon">🐄</span>
+              Nenhum animal encontrado.
+            </div>
+          ) : (
+            <div className="repro-cow-grid">
+              {sortedCows.map(cow => (
+                <div
+                  key={cow.id}
+                  className={`repro-cow-card ${
+                    selected === cow.id ? 'selected' : ''
+                  }`}
+                  onClick={() => selectCow(cow.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      selectCow(cow.id)
                     }
-                  >
+                  }}
+                >
+                  <div className="repro-card-top">
+                    <div className="repro-avatar">
+                      {getInitials(cow.nome)}
+                    </div>
 
-                    <td>
-
-                      <div className="animal-cell">
-
-                        <div className="animal-avatar">
-
-                          {cow.nome
-                            .split(' ')
-                            .map(
-                              p => p[0]
-                            )
-                            .join('')
-                            .slice(0, 2)
-                            .toUpperCase()}
-
-                        </div>
-
-                        <div>
-
-                          <strong>
-                            {cow.nome}
-                          </strong>
-
-                          <span>
-                            Animal cadastrado
-                          </span>
-
-                        </div>
-
+                    <div>
+                      <div className="repro-card-name">
+                        {cow.nome}
                       </div>
 
-                    </td>
+                      <div className="repro-card-id">
+                        Brinco/ID #{cow.id}
+                      </div>
+                    </div>
+                  </div>
 
-                    <td>
+                  <div className="repro-card-grid">
+                    <div className="repro-card-stat">
+                      <span>Raça</span>
+                      <strong>
+                        {cow.raca || 'Não informada'}
+                      </strong>
+                    </div>
 
-                      <span className="id-badge">
-                        #{cow.id}
-                      </span>
-
-                    </td>
-
-                    <td>
-
-                      <span className="race-text">
-                        {cow.raca ||
-                          'Não informado'}
-                      </span>
-
-                    </td>
-
-                    <td>
-
-                      <span className="lactation-badge">
-
+                    <div className="repro-card-stat">
+                      <span>Lactação</span>
+                      <strong>
                         {cow.lactacao
-                          ? `${cow.lactacao}ª lactação`
-                          : 'Não informado'}
+                          ? `${cow.lactacao}ª`
+                          : '-'}
+                      </strong>
+                    </div>
+                  </div>
 
-                      </span>
+                  <div className="repro-card-footer">
+                    <span>Produção diária</span>
+                    <strong>{cow.litros} L</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
-                    </td>
-
-                    <td>
-
-                      <div className="production-cell">
-
-                        <strong>
-                          {cow.litros} L
-                        </strong>
-
-                        <span>
-                          produção diária
-                        </span>
-
-                      </div>
-
-                    </td>
-
-                    <td className="action-column">
-
-                      <button
-                        className={
-                          selected === cow.id
-                            ? 'select-cow-btn selected'
-                            : 'select-cow-btn'
-                        }
-                        onClick={() =>
-                          selectCow(
-                            cow.id
-                          )
-                        }
-                      >
-
-                        {selected === cow.id
-                          ? 'Selecionada'
-                          : 'Selecionar'}
-
-                      </button>
-
-                    </td>
-
-                  </tr>
-
-                ))}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        </div>
-
-        {/* ================================================= */}
-        {/* PRÓXIMOS PROCEDIMENTOS */}
-        {/* ================================================= */}
-
-        <div
-          className="sub-panel"
-          style={{
-            marginTop: 20,
-          }}
-        >
-
-          <div className="table-header">
-
+        <section className="repro-section">
+          <div className="repro-section-head">
             <div>
-
-              <h3>
+              <h3 className="repro-section-title">
                 Próximos procedimentos
               </h3>
 
-              <span className="table-subtitle">
-                Agendamentos organizados
-                por data.
+              <span className="repro-section-description">
+                {pendingAppointments} pendente(s) ·{' '}
+                {completedAppointments} realizado(s)
               </span>
-
             </div>
 
+            <select
+              className="repro-field"
+              style={{ width: 170 }}
+              value={appointmentFilter}
+              onChange={e =>
+                setAppointmentFilter(e.target.value)
+              }
+            >
+              <option value="todos">Todos</option>
+              <option value="Agendado">Agendados</option>
+              <option value="Realizado">Realizados</option>
+            </select>
           </div>
 
-          <div className="table-container">
-
-            <table className="modern-table">
-
+          <div className="repro-table-wrap">
+            <table className="repro-table">
               <thead>
-
                 <tr>
-
-                  <th>
-                    Animal
-                  </th>
-
-                  <th>
-                    Procedimento
-                  </th>
-
-                  <th>
-                    Data
-                  </th>
-
-                  <th>
-                    Status
-                  </th>
-
-                  <th>
-                    Observação
-                  </th>
-
-                  <th className="action-column">
+                  <th>Animal</th>
+                  <th>Procedimento</th>
+                  <th>Data</th>
+                  <th>Status</th>
+                  <th>Observação</th>
+                  <th style={{ textAlign: 'right' }}>
                     Ações
                   </th>
-
                 </tr>
-
               </thead>
 
               <tbody>
-
                 {sortedAppointments.length === 0 && (
-
                   <tr>
-
-                    <td
-                      colSpan={6}
-                      className="empty-table"
-                    >
-                      Nenhum procedimento
-                      cadastrado.
+                    <td colSpan={6} className="repro-empty">
+                      <span className="repro-empty-icon">
+                        📅
+                      </span>
+                      Nenhum procedimento encontrado.
                     </td>
-
                   </tr>
-
                 )}
 
-                {sortedAppointments.map(
-                  appointment => (
-
-                    <tr
-                      key={
-                        appointment.id
-                      }
-                    >
-
-                      <td>
-
-                        <div className="animal-cell">
-
-                          <div className="animal-avatar">
-
-                            {appointment.animal
-                              .split(' ')
-                              .map(
-                                p => p[0]
-                              )
-                              .join('')
-                              .slice(
-                                0,
-                                2
-                              )
-                              .toUpperCase()}
-
-                          </div>
-
-                          <strong>
-                            {appointment.animal}
-                          </strong>
-
+                {sortedAppointments.map(item => (
+                  <tr key={item.id}>
+                    <td>
+                      <div className="repro-animal">
+                        <div className="repro-avatar">
+                          {getInitials(item.animal)}
                         </div>
 
-                      </td>
-
-                      <td>
-
-                        <span className="procedure-badge">
-                          {appointment.tipo}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <strong>
-                          {formatDate(
-                            appointment.data
-                          )}
-                        </strong>
-
-                      </td>
-
-                      <td>
-
-                        {appointment.status ===
-                        'Realizado' ? (
-
-                          <span className="status-realizado">
-                            Realizado
+                        <div>
+                          <span className="repro-animal-name">
+                            {item.animal}
                           </span>
 
-                        ) : (
-
-                          <span className="status-agendado">
-                            Agendado
+                          <span className="repro-animal-meta">
+                            ID {item.animalId}
                           </span>
+                        </div>
+                      </div>
+                    </td>
 
-                        )}
+                    <td>
+                      <span className="repro-type">
+                        {item.tipo}
+                      </span>
+                    </td>
 
-                      </td>
+                    <td>
+                      <strong>
+                        {formatDate(item.data)}
+                      </strong>
+                    </td>
 
-                      <td>
+                    <td>
+                      <span
+                        className={`repro-status ${
+                          item.status === 'Realizado'
+                            ? 'realizado'
+                            : 'agendado'
+                        }`}
+                      >
+                        {item.status || 'Agendado'}
+                      </span>
+                    </td>
 
-                        <span className="race-text">
-                          {
-                            appointment.observacao
-                          }
-                        </span>
+                    <td>
+                      <span
+                        style={{
+                          color: '#6f6a61',
+                          fontSize: 11,
+                        }}
+                      >
+                        {item.observacao}
+                      </span>
+                    </td>
 
-                      </td>
-
-                      <td className="action-column">
-
-                        {appointment.status !==
-                          'Realizado' && (
-
+                    <td>
+                      <div className="repro-action-group">
+                        {item.status !== 'Realizado' && (
                           <button
-                            className="complete-btn"
+                            type="button"
+                            className="repro-complete-btn"
                             onClick={() =>
-                              completeAppointment(
-                                appointment.id
-                              )
+                              completeAppointment(item.id)
                             }
                           >
                             Concluir
                           </button>
-
                         )}
 
                         <button
-                          className="remove-btn"
+                          type="button"
+                          className="repro-remove-btn"
                           onClick={() =>
-                            removeAppointment(
-                              appointment.id
-                            )
+                            removeAppointment(item.id)
                           }
                         >
                           Remover
                         </button>
-
-                      </td>
-
-                    </tr>
-
-                  )
-                )}
-
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
-
             </table>
-
           </div>
-
-        </div>
-
+        </section>
       </div>
     </Card>
   )
